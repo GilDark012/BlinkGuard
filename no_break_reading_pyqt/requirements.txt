@@ -1,7 +1,10 @@
-opencv-python>=4.8.0
-mediapipe>=0.10.0
-PyQt6>=6.5.0
-PyMuPDF>=1.23.0
-pygame>=2.5.0
-numpy>=1.24.0
-Pillow>=10.0.0
+# Python 3.9 - 3.12 (MediaPipe ne publie pas de roues pour les versions plus récentes)
+opencv-python>=4.8,<5
+# L'API mp.solutions (FaceMesh) a été retirée à partir de mediapipe 0.10.30
+mediapipe>=0.10.9,<0.10.22
+# MediaPipe 0.10.x plante avec protobuf >= 5 (erreur FieldDescriptor .label)
+protobuf>=3.20,<5
+PyQt6>=6.5,<7
+PyMuPDF>=1.24.3,<2
+pygame>=2.5,<3
+numpy>=1.24,<2

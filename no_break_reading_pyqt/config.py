@@ -8,42 +8,35 @@ EYE_TRACKING_CONFIG = {
     'min_detection_confidence': 0.5,
     'min_tracking_confidence': 0.5,
     'webcam_index': 0,
-    'frame_width': 640,
-    'frame_height': 480,
-    'fps_target': 30
+    'frame_interval_ms': 33,        # ~30 FPS visés
+    'max_read_failures': 30,        # lectures webcam ratées avant arrêt
 }
 
-# Configuration Alertes
+# Configuration Alertes (toutes les durées sont en secondes)
 ALERT_CONFIG = {
-    'trigger_frames': 30,      # ~0.7s à 30fps
-    'duration': 5.0,           # secondes
-    'cooldown': 10.0,          # secondes
-    'frequency': 800,          # Hz
-    'enabled': True
+    'trigger_seconds': 1.0,        # yeux fermés depuis X s -> alerte
+    'duration': 5.0,               # durée du son
+    'cooldown': 10.0,              # attente après la fin du son avant de relancer
+    'reset_after': 5.0,            # yeux ouverts X s -> l'intensité revient à 100%
+    'face_lost_alert': True,       # alerter si le visage disparaît (tête qui tombe)
+    'face_lost_seconds': 5.0,
+    'frequency': 800,              # Hz
+    'volume_increase': 0.2,        # +20% par alerte consécutive
+    'max_volume_multiplier': 3.0,
+    'enabled': True,
 }
 
 # Configuration PDF
 PDF_CONFIG = {
-    'default_zoom': 0.5,
-    'min_zoom': 0.2,
-    'max_zoom': 1.0,
-    'auto_scroll_enabled': False,
-    'scroll_speed': 5
+    'default_zoom': 1.2,
+    'min_zoom': 0.5,
+    'max_zoom': 3.0,
+    'zoom_debounce_ms': 150,
 }
 
 # Configuration Statistiques
 STATS_CONFIG = {
     'data_point_interval': 1.0,  # secondes
-    'auto_save': True,
-    'save_interval': 60.0,       # secondes
-    'export_format': 'csv'       # 'csv' | 'json'
-}
-
-# Chemins
-PATHS = {
-    'exports': './exports/',
-    'temp': './temp/',
-    'logs': './logs/'
 }
 
 # Constantes Eye Tracking

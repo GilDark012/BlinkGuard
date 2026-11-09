@@ -6,31 +6,37 @@ Application desktop professionnelle de lecture PDF avec surveillance oculaire.
 
 - ✅ **Interface PyQt6 moderne** : Application desktop native multi-plateforme
 - ✅ **Eye Tracking temps réel** : Détection ouverture/fermeture des yeux (30 FPS)
-- ✅ **Alertes sonores** : Bip de 3s + cooldown 10s
-- ✅ **Lecteur PDF intégré** : Navigation, zoom, statistiques
-- ✅ **Dialogs de configuration** : Paramètres EAR, alertes personnalisables
+- ✅ **Alertes sonores progressives** : son de 5s, puis 10s d'attente ; chaque alerte suivante est 20% plus forte
+- ✅ **Alerte « visage absent »** : si la tête tombe et que le visage sort du champ pendant 5s
+- ✅ **Lecteur PDF intégré** : Navigation (boutons ou flèches / PageUp / PageDown), zoom 50–300%, statistiques
 - ✅ **Export CSV/JSON** : Statistiques détaillées
 - ✅ **Menu complet** : Raccourcis clavier, fenêtre statistiques
 
 ## 📋 Prérequis
 
-- Python 3.8+
+- Python 3.9 – 3.12 (MediaPipe ne supporte pas encore les versions plus récentes)
 - Webcam
 - Système audio
 
 ## 🚀 Installation
 
 ```bash
-# 1. Extraire le ZIP
-unzip no_break_reading_pyqt.zip
 cd no_break_reading_pyqt
 
-# 2. Installer les dépendances
+# 1. Créer un environnement virtuel Python 3.11 dans un chemin SANS accents
+#    (MediaPipe n'arrive pas à charger ses modèles si le chemin contient é, è...)
+py -3.11 -m venv C:\venvs\blinkguard          # Windows
+C:\venvs\blinkguard\Scripts\activate
+
+# 2. Installer les dépendances (versions figées et compatibles)
 pip install -r requirements.txt
 
 # 3. Lancer l'application
 python main.py
 ```
+
+> ⚠️ Utilisez un environnement dédié : un `protobuf` récent installé par d'autres
+> paquets (Streamlit, TensorBoard...) fait planter MediaPipe 0.10.x.
 
 ## 📖 Utilisation
 
@@ -68,15 +74,24 @@ L'application se divise en 2 panneaux :
 - `Ctrl+O` : Ouvrir PDF
 - `Ctrl+S` : Voir statistiques
 - `Ctrl+Q` : Quitter
+- `→` / `PageDown` : Page suivante
+- `←` / `PageUp` : Page précédente
 
 ### Paramètres ajustables
 
-Via le menu "Paramètres" :
-- **Seuil EAR** : Sensibilité détection yeux fermés
-- **Durée alerte** : 1-10 secondes
-- **Cooldown** : 5-60 secondes
-- **Frames déclenchement** : 10-100 frames
-- **Activer/désactiver le son**
+Pour l'instant, les réglages se font dans `config.py` (un écran de réglages est prévu) :
+- **`ear_threshold`** : sensibilité de détection des yeux fermés
+- **`trigger_seconds`** : yeux fermés depuis combien de secondes avant l'alerte
+- **`duration`** / **`cooldown`** : durée du son et attente avant la relance
+- **`face_lost_alert`** / **`face_lost_seconds`** : alerte quand le visage disparaît
+- **`webcam_index`** : choix de la caméra
+
+## 🧪 Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
 
 ## 🔧 Résolution de problèmes
 
@@ -135,7 +150,7 @@ no_break_reading_pyqt/
 - **EAR** (Eye Aspect Ratio) : 0.0-0.4
 - **État yeux** : OUVERT 🟢 / FERME 🔴
 - **Clignements** : Compteur total
-- **Frames fermées** : Nombre consécutif
+- **Yeux fermés depuis** : durée en secondes
 - **Temps lecture** : Par session
 - **Pages visitées** : Nombre
 - **Score attention** : 0-100%

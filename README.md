@@ -24,12 +24,14 @@ Final project for the *Human Machine Interface* course (Aivancity, PGE-5).
 ## Quick start (PyQt6 app)
 
 ```bash
+py -3.11 -m venv C:\venvs\blinkguard        # path without accents: MediaPipe needs it
+C:\venvs\blinkguard\Scripts\activate
 cd no_break_reading_pyqt
 pip install -r requirements.txt
 python main.py
 ```
 
-You need Python 3.8+, a webcam and working audio output.
+You need Python 3.9–3.12, a webcam and working audio output. Run the tests with `pip install -r requirements-dev.txt` and then `python -m pytest`.
 
 ## Privacy
 

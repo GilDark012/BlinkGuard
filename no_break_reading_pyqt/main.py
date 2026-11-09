@@ -5,23 +5,25 @@ Interface desktop avec zoom PDF fonctionnel
 """
 
 import sys
-import cv2
-import numpy as np
-import os
 from pathlib import Path
 
-from PyQt6.QtWidgets import *
+import cv2
+
+from PyQt6.QtWidgets import (
+    QApplication, QFileDialog, QGroupBox, QHBoxLayout, QLabel, QMainWindow,
+    QMessageBox, QPushButton, QScrollArea, QSlider, QSplitter, QVBoxLayout, QWidget,
+)
 from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QImage, QPixmap, QAction, QFont
+from PyQt6.QtGui import QImage, QPixmap, QAction, QFont, QKeySequence, QShortcut
 
 # Import modules core
 sys.path.insert(0, str(Path(__file__).parent))
 
-from core.eye_tracker import EyeTracker
-from core.alert_system import AlertSystem
+from core.eye_tracker import EyeTracker, EyeTrackerError, STATE_OPEN, STATE_NO_FACE
+from core.alert_system import AlertSystem, REASON_FACE_LOST
 from core.pdf_reader import PDFReader
 from core.statistics_manager import StatisticsManager
-from config import EYE_TRACKING_CONFIG, ALERT_CONFIG
+from config import EYE_TRACKING_CONFIG, ALERT_CONFIG, PDF_CONFIG, STATS_CONFIG
 
 class NoBreakReadingApp(QMainWindow):
     """Application principale PyQt6"""
@@ -30,11 +32,22 @@ class NoBreakReadingApp(QMainWindow):
         super().__init__()
 
         # Modules core
-        self.eye_tracker = EyeTracker(ear_threshold=EYE_TRACKING_CONFIG['ear_threshold'])
+        self.eye_tracker = EyeTracker(
+            ear_threshold=EYE_TRACKING_CONFIG['ear_threshold'],
+            min_detection_confidence=EYE_TRACKING_CONFIG['min_detection_confidence'],
+            min_tracking_confidence=EYE_TRACKING_CONFIG['min_tracking_confidence'],
+        )
         self.alert_system = AlertSystem(
-            trigger_frames=ALERT_CONFIG['trigger_frames'],
+            trigger_seconds=ALERT_CONFIG['trigger_seconds'],
             duration=ALERT_CONFIG['duration'],
-            cooldown=ALERT_CONFIG['cooldown']
+            cooldown=ALERT_CONFIG['cooldown'],
+            reset_after=ALERT_CONFIG['reset_after'],
+            face_lost_alert=ALERT_CONFIG['face_lost_alert'],
+            face_lost_seconds=ALERT_CONFIG['face_lost_seconds'],
+            frequency=ALERT_CONFIG['frequency'],
+            volume_increase=ALERT_CONFIG['volume_increase'],
+            max_volume_multiplier=ALERT_CONFIG['max_volume_multiplier'],
+            sound_enabled=ALERT_CONFIG['enabled'],
         )
         self.pdf_reader = PDFReader()
         self.stats_manager = StatisticsManager()
@@ -42,12 +55,16 @@ class NoBreakReadingApp(QMainWindow):
         # État
         self.tracking_active = False
         self.cap = None
+        self.read_failures = 0
 
         # Setup UI
         self.init_ui()
         self.init_menu()
         self.init_timers()
+        self.init_shortcuts()
 
+        if not self.alert_system.audio_available:
+            self.alert_status_label.setText("Status: Son indisponible ⚠️ (alerte visuelle seulement)")
         self.statusBar().showMessage("Prêt à démarrer 🚀")
 
     def init_ui(self):
@@ -118,7 +135,7 @@ class NoBreakReadingApp(QMainWindow):
         self.ear_label = QLabel("EAR: --")
         self.state_label = QLabel("État: Inactif")
         self.blinks_label = QLabel("Clignements: 0")
-        self.closed_frames_label = QLabel("Frames fermées: 0")
+        self.closed_frames_label = QLabel("Yeux fermés depuis: 0.0s")
 
         for label in [self.ear_label, self.state_label, self.blinks_label, self.closed_frames_label]:
             label.setStyleSheet("font-size: 12pt; padding: 5px;")
@@ -178,15 +195,15 @@ class NoBreakReadingApp(QMainWindow):
         zoom_label.setStyleSheet("font-weight: bold; font-size: 11pt;")
 
         self.zoom_slider = QSlider(Qt.Orientation.Horizontal)
-        self.zoom_slider.setMinimum(50)   # 0.5x
-        self.zoom_slider.setMaximum(300)  # 3.0x
-        self.zoom_slider.setValue(120)    # 1.2x par défaut
+        self.zoom_slider.setMinimum(int(PDF_CONFIG['min_zoom'] * 100))
+        self.zoom_slider.setMaximum(int(PDF_CONFIG['max_zoom'] * 100))
+        self.zoom_slider.setValue(int(PDF_CONFIG['default_zoom'] * 100))
         self.zoom_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
         self.zoom_slider.setTickInterval(25)
         self.zoom_slider.valueChanged.connect(self.on_zoom_changed)
         self.zoom_slider.setEnabled(False)
 
-        self.zoom_value_label = QLabel("1.2x")
+        self.zoom_value_label = QLabel(f"{PDF_CONFIG['default_zoom']:.1f}x")
         self.zoom_value_label.setStyleSheet("font-weight: bold; font-size: 11pt; min-width: 50px;")
 
         zoom_layout.addWidget(zoom_label)
@@ -243,11 +260,12 @@ class NoBreakReadingApp(QMainWindow):
 
     def on_zoom_changed(self, value):
         """Appelé quand le slider de zoom change"""
-        zoom = value / 100.0  # Convertir en facteur (0.5 à 3.0)
+        zoom = value / 100.0
         self.zoom_value_label.setText(f"{zoom:.1f}x")
         self.pdf_reader.set_zoom(zoom)
+        # Re-rendu différé : évite de recalculer la page à chaque cran du slider
         if self.pdf_reader.document:
-            self.display_page()
+            self.zoom_timer.start(PDF_CONFIG['zoom_debounce_ms'])
 
     def init_menu(self):
         """Initialise la barre de menu"""
@@ -294,106 +312,148 @@ class NoBreakReadingApp(QMainWindow):
 
         self.stats_timer = QTimer()
         self.stats_timer.timeout.connect(self.update_statistics)
-        self.stats_timer.start(1000)
+        self.stats_timer.start(int(STATS_CONFIG['data_point_interval'] * 1000))
+
+        self.zoom_timer = QTimer()
+        self.zoom_timer.setSingleShot(True)
+        self.zoom_timer.timeout.connect(self.display_page)
+
+    def init_shortcuts(self):
+        """Navigation clavier dans le PDF"""
+        for key in (Qt.Key.Key_Right, Qt.Key.Key_PageDown):
+            QShortcut(QKeySequence(key), self, activated=self.next_page)
+        for key in (Qt.Key.Key_Left, Qt.Key.Key_PageUp):
+            QShortcut(QKeySequence(key), self, activated=self.previous_page)
+
+    def _set_start_button(self, running):
+        color, hover = ("#e74c3c", "#ec7063") if running else ("#27ae60", "#2ecc71")
+        self.start_btn.setText("⏸️ Arrêter" if running else "▶️ Démarrer Eye Tracking")
+        self.start_btn.setStyleSheet(f"""
+            QPushButton {{
+                font-size: 14pt; padding: 12px; background-color: {color};
+                color: white; border-radius: 8px; font-weight: bold;
+            }}
+            QPushButton:hover {{ background-color: {hover}; }}
+        """)
 
     def toggle_eye_tracking(self):
         """Démarre/arrête l'eye tracking"""
-        if not self.tracking_active:
-            self.cap = cv2.VideoCapture(0)
-            if self.cap.isOpened():
-                self.eye_tracker.start()
-                self.tracking_active = True
-                self.start_btn.setText("⏸️ Arrêter")
-                self.start_btn.setStyleSheet("""
-                    QPushButton {
-                        font-size: 14pt; padding: 12px; background-color: #e74c3c;
-                        color: white; border-radius: 8px; font-weight: bold;
-                    }
-                    QPushButton:hover { background-color: #ec7063; }
-                """)
-                self.webcam_timer.start(33)
-                self.statusBar().showMessage("Eye tracking actif 🟢")
-            else:
-                QMessageBox.warning(self, "Erreur", "Impossible d'ouvrir la webcam!")
+        if self.tracking_active:
+            self.stop_eye_tracking()
         else:
-            self.tracking_active = False
-            self.start_btn.setText("▶️ Démarrer Eye Tracking")
-            self.start_btn.setStyleSheet("""
-                QPushButton {
-                    font-size: 14pt; padding: 12px; background-color: #27ae60;
-                    color: white; border-radius: 8px; font-weight: bold;
-                }
-                QPushButton:hover { background-color: #2ecc71; }
-            """)
-            self.webcam_timer.stop()
-            if self.cap:
-                self.cap.release()
-            self.eye_tracker.stop()
-            self.webcam_label.setText("Webcam inactive")
-            self.statusBar().showMessage("Eye tracking arrêté 🔴")
+            self.start_eye_tracking()
+
+    def start_eye_tracking(self):
+        self.cap = cv2.VideoCapture(EYE_TRACKING_CONFIG['webcam_index'])
+        if not self.cap.isOpened():
+            self._release_camera()
+            QMessageBox.warning(self, "Erreur", "Impossible d'ouvrir la webcam !\n"
+                                "Vérifiez qu'elle est branchée et qu'aucune autre application ne l'utilise.")
+            return
+        try:
+            self.eye_tracker.start()
+        except EyeTrackerError as e:
+            self._release_camera()
+            QMessageBox.critical(self, "Eye tracking indisponible", str(e))
+            return
+
+        self.alert_system.reset()
+        self.read_failures = 0
+        self.tracking_active = True
+        self._set_start_button(running=True)
+        self.webcam_timer.start(EYE_TRACKING_CONFIG['frame_interval_ms'])
+        self.statusBar().showMessage("Eye tracking actif 🟢")
+
+    def stop_eye_tracking(self, message="Eye tracking arrêté 🔴"):
+        self.tracking_active = False
+        self.webcam_timer.stop()
+        self._release_camera()
+        self.eye_tracker.stop()
+        self.alert_system.reset()
+        self._set_start_button(running=False)
+        self.webcam_label.clear()
+        self.webcam_label.setText("Webcam inactive")
+        self.statusBar().showMessage(message)
+
+    def _release_camera(self):
+        if self.cap is not None:
+            self.cap.release()
+            self.cap = None
 
     def update_webcam(self):
         """Mise à jour webcam avec eye tracking"""
-        if self.cap and self.cap.isOpened():
-            ret, frame = self.cap.read()
-            if ret:
-                frame = cv2.flip(frame, 1)
+        if not (self.cap and self.cap.isOpened()):
+            return
+        ret, frame = self.cap.read()
+        if not ret:
+            self.read_failures += 1
+            if self.read_failures >= EYE_TRACKING_CONFIG['max_read_failures']:
+                self.stop_eye_tracking("Webcam déconnectée ⚠️")
+                QMessageBox.warning(self, "Webcam", "La webcam ne répond plus : eye tracking arrêté.")
+            return
+        self.read_failures = 0
 
-                # Eye tracking
-                result = self.eye_tracker.process_frame(frame)
+        result = self.eye_tracker.process_frame(cv2.flip(frame, 1))
 
-                # Afficher frame
-                h, w, ch = result['frame'].shape
-                qt_image = QImage(result['frame'].data, w, h, w * ch, QImage.Format.Format_BGR888)
-                pixmap = QPixmap.fromImage(qt_image).scaled(
-                    self.webcam_label.size(),
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
-                )
-                self.webcam_label.setPixmap(pixmap)
+        # Afficher frame
+        img = result['frame']
+        h, w, ch = img.shape
+        qt_image = QImage(img.data, w, h, w * ch, QImage.Format.Format_BGR888)
+        pixmap = QPixmap.fromImage(qt_image).scaled(
+            self.webcam_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.webcam_label.setPixmap(pixmap)
 
-                # Stats
-                self.ear_label.setText(f"EAR: {result['ear_avg']:.3f}")
+        # Stats
+        state = result['eye_state']
+        self.ear_label.setText(f"EAR: {result['ear_avg']:.3f}" if result['face_detected'] else "EAR: --")
+        if state == STATE_OPEN:
+            icon, color = "🟢", "#27ae60"
+        elif state == STATE_NO_FACE:
+            icon, color = "🟠", "#e67e22"
+        else:
+            icon, color = "🔴", "#e74c3c"
+        self.state_label.setText(f"État: {icon} {state}")
+        self.state_label.setStyleSheet(f"color: {color}; font-weight: bold; font-size: 12pt; padding: 5px;")
 
-                if result['eye_state'] == "OUVERT":
-                    self.state_label.setText(f"État: 🟢 {result['eye_state']}")
-                    self.state_label.setStyleSheet("color: #27ae60; font-weight: bold; font-size: 12pt; padding: 5px;")
-                else:
-                    self.state_label.setText(f"État: 🔴 {result['eye_state']}")
-                    self.state_label.setStyleSheet("color: #e74c3c; font-weight: bold; font-size: 12pt; padding: 5px;")
+        stats = self.eye_tracker.get_statistics()
+        self.blinks_label.setText(f"Clignements: {stats['total_blinks']}")
+        self.closed_frames_label.setText(f"Yeux fermés depuis: {result['closed_seconds']:.1f}s")
 
-                stats = self.eye_tracker.get_statistics()
-                self.blinks_label.setText(f"Clignements: {stats['total_blinks']}")
-                self.closed_frames_label.setText(f"Frames fermées: {result['closed_duration']}")
+        # Alertes avec intensité progressive
+        alert = self.alert_system.check_and_trigger(
+            result['closed_seconds'], result['face_missing_seconds']
+        )
+        if alert:
+            intensity = int(self.alert_system.get_alert_intensity() * 100)
+            count = self.alert_system.get_alert_count()
+            why = "Visage absent" if self.alert_system.last_reason == REASON_FACE_LOST else "Yeux fermés"
+            self.statusBar().showMessage(f"⚠️ ALERTE #{count} ({why}) - Intensité: {intensity}%! 🔔", 5000)
 
-                # Alertes avec intensité progressive
-                alert = self.alert_system.check_and_trigger(result['closed_duration'])
-                if alert:
-                    intensity = int(self.alert_system.get_alert_intensity() * 100)
-                    count = self.alert_system.get_alert_count()
-                    self.statusBar().showMessage(f"⚠️ ALERTE #{count} - Intensité: {intensity}%! 🔔", 3000)
+        cooldown = self.alert_system.get_cooldown_remaining()
+        self.cooldown_label.setText(f"Prochaine alerte possible dans: {cooldown:.1f}s")
+        self.alert_intensity_label.setText(
+            f"Intensité: {int(self.alert_system.get_alert_intensity() * 100)}%"
+        )
 
-                cooldown = self.alert_system.get_cooldown_remaining()
-                self.cooldown_label.setText(f"Cooldown: {cooldown:.1f}s")
-
-                # Afficher intensité
-                intensity_pct = int(self.alert_system.get_alert_intensity() * 100)
-                self.alert_intensity_label.setText(f"Intensité: {intensity_pct}%")
-
-                # Stats
-                self.stats_manager.update_eye_tracking(stats)
-                self.stats_manager.update_alert(alert)
+        self.stats_manager.update_eye_tracking(stats, eye_state=state)
+        self.stats_manager.update_alert(alert, self.alert_system.last_reason if alert else None)
 
     def open_pdf(self):
         """Ouvre un PDF"""
         file_path, _ = QFileDialog.getOpenFileName(self, "Ouvrir PDF", "", "PDF Files (*.pdf)")
-        if file_path:
-            if self.pdf_reader.load_pdf(file_path):
-                self.display_page()
-                self.prev_btn.setEnabled(True)
-                self.next_btn.setEnabled(True)
-                self.zoom_slider.setEnabled(True)
-                self.statusBar().showMessage(f"PDF chargé: {Path(file_path).name}")
+        if not file_path:
+            return
+        if not self.pdf_reader.load_pdf(file_path):
+            QMessageBox.warning(self, "PDF", f"Impossible d'ouvrir ce PDF :\n{self.pdf_reader.last_error}")
+            return
+        self.display_page()
+        self.prev_btn.setEnabled(True)
+        self.next_btn.setEnabled(True)
+        self.zoom_slider.setEnabled(True)
+        self.statusBar().showMessage(f"PDF chargé: {Path(file_path).name}")
 
     def display_page(self):
         """Affiche la page PDF avec le zoom actuel"""
@@ -431,18 +491,28 @@ class NoBreakReadingApp(QMainWindow):
             self.display_page()
 
     def update_statistics(self):
-        self.stats_manager.add_data_point()
         if self.pdf_reader.document:
-            self.stats_manager.update_reading(self.pdf_reader.get_reading_statistics())
+            stats = self.pdf_reader.get_reading_statistics()
+            self.stats_manager.update_reading(stats)
+            self.reading_time_label.setText(f"⏱️ Temps: {stats['total_time']:.0f}s")
+        if self.tracking_active:
+            self.stats_manager.add_data_point()
 
     def export_stats(self, fmt):
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Exporter", f"stats.{fmt}", f"{fmt.upper()} (*.{fmt})"
         )
-        if file_path:
-            success = self.stats_manager.export_to_csv(file_path) if fmt == 'csv' else self.stats_manager.export_to_json(file_path)
-            if success:
-                QMessageBox.information(self, "Succès", f"Stats exportées:\n{file_path}")
+        if not file_path:
+            return
+        try:
+            if fmt == 'csv':
+                self.stats_manager.export_to_csv(file_path)
+            else:
+                self.stats_manager.export_to_json(file_path)
+        except OSError as e:
+            QMessageBox.warning(self, "Export", f"Échec de l'export :\n{e}")
+            return
+        QMessageBox.information(self, "Succès", f"Stats exportées:\n{file_path}")
 
     def show_statistics(self):
         summary = self.stats_manager.get_summary()
@@ -478,12 +548,12 @@ class NoBreakReadingApp(QMainWindow):
         """)
 
     def closeEvent(self, event):
-        if self.cap:
-            self.cap.release()
+        for timer in (self.webcam_timer, self.stats_timer, self.zoom_timer):
+            timer.stop()
+        self._release_camera()
         self.eye_tracker.stop()
         self.alert_system.shutdown()
-        if self.pdf_reader.document:
-            self.pdf_reader.close()
+        self.pdf_reader.close()
         event.accept()
 
 def main():
