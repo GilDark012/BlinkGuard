@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Archives (duplicates of the source folders)
+*.zip
+
+# Presentation files (kept locally, too heavy for the repo)
+*.pptx
+*.pdf
+
+# Exported statistics
+exports/*
+!exports/.gitkeep
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
