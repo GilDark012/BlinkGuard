@@ -4,10 +4,25 @@ A PDF reader that watches your eyes through the webcam and wakes you up with a s
 
 Final project for the *Human Machine Interface* course (Aivancity, PGE-5).
 
+## Demo
+
+| Eye-closure detection | Progressive alarm |
+|:---:|:---:|
+| <img src="docs/demo/1-eye-detection.gif" width="300" alt="The eye contours turn red and the state switches from OUVERT to FERME as soon as the eyes close"> | <img src="docs/demo/2-progressive-alarm.gif" width="300" alt="Eyes kept closed: the alarm rings, waits out its cooldown, then rings again 20% louder"> |
+| Face Mesh landmarks + Eye Aspect Ratio, live at 30 FPS | Eyes kept closed: the alarm rings, then rings again 20% louder (sped up ×2) |
+
+**PDF reader**: page navigation, zoom and reading progress
+
+<img src="docs/demo/3-pdf-navigation.gif" width="720" alt="Turning a page in the built-in PDF reader">
+
+**Session statistics**: reading time, blinks, alerts, attention score, CSV/JSON export
+
+<img src="docs/demo/4-session-stats.gif" width="720" alt="The statistics dialog summarising the reading session">
+
 ## How it works
 
-- **Eye tracking**: MediaPipe Face Mesh finds the eye landmarks and computes the **Eye Aspect Ratio (EAR)**. When the EAR stays below a threshold for N consecutive frames, the eyes count as closed.
-- **Alerts**: an alarm rings for 3 s, then waits through a 10 s cooldown. If the eyes stay closed, each new alert is 20% louder than the last one.
+- **Eye tracking**: MediaPipe Face Mesh finds the eye landmarks and computes the **Eye Aspect Ratio (EAR)**. When the EAR stays below a threshold for about a second, the eyes count as closed.
+- **Alerts**: an alarm rings for 5 s, then waits through a 10 s cooldown. If the eyes stay closed, each new alert is 20% louder than the last one. An alarm also goes off when the face leaves the camera for 5 s.
 - **PDF reader**: open a PDF, move between pages, and zoom from 50% to 300%.
 - **Statistics**: reading time, pages visited, blinks, an attention score, and export to CSV or JSON.
 

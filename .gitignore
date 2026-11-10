@@ -26,3 +26,7 @@ desktop.ini
 
 # Private development notes
 No Break Reader conversation perplexity.md
+
+# Raw demo recordings (the GIFs in docs/demo are what we publish)
+*.mp4
+*.mov
