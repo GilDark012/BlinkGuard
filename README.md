@@ -19,7 +19,6 @@ Final project for the *Human Machine Interface* course (Aivancity, PGE-5).
 | [`no_break_reading/`](no_break_reading/) | Earlier Streamlit web version |
 | [`eye_track.py`](eye_track.py) | Standalone prototype: detects open or closed eyes |
 | [`eye_song.py`](eye_song.py) | Standalone prototype: eye detection plus a sound alert |
-| [`No Break Reader conversation perplexity.md`](No%20Break%20Reader%20conversation%20perplexity.md) | Development log (the design conversation) |
 
 ## Quick start (PyQt6 app)
 
