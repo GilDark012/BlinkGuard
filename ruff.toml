@@ -1,0 +1,6 @@
+# Lint settings for the Python code (desktop app v1 and prototypes)
+line-length = 120
+target-version = "py39"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]

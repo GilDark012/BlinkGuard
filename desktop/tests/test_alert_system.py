@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
-
-from core.alert_system import AlertSystem, REASON_EYES_CLOSED, REASON_FACE_LOST
+from core.alert_system import REASON_EYES_CLOSED, REASON_FACE_LOST, AlertSystem
 
 
 @pytest.fixture

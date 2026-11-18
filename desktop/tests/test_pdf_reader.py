@@ -1,8 +1,7 @@
 import pymupdf as fitz
 import pytest
-
-from core.pdf_reader import PDFReader
 from config import PDF_CONFIG
+from core.pdf_reader import PDFReader
 
 
 @pytest.fixture

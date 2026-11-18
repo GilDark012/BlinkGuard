@@ -1,7 +1,11 @@
 import pytest
-
 from core.eye_tracker import (
-    EyeTracker, calculate_ear, STATE_OPEN, STATE_CLOSED, STATE_NO_FACE, STATE_INACTIVE,
+    STATE_CLOSED,
+    STATE_INACTIVE,
+    STATE_NO_FACE,
+    STATE_OPEN,
+    EyeTracker,
+    calculate_ear,
 )
 
 OPEN_EYE = [(0, 0), (3, -2), (7, -2), (10, 0), (7, 2), (3, 2)]     # EAR = 0.4

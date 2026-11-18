@@ -2,7 +2,6 @@ import csv
 import json
 
 import pytest
-
 from core.statistics_manager import StatisticsManager
 
 

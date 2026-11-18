@@ -1,9 +1,8 @@
 """Module de lecture et gestion de PDF"""
 import time
 
-import pymupdf as fitz
 import numpy as np
-
+import pymupdf as fitz
 from config import PDF_CONFIG
 
 

@@ -8,22 +8,33 @@ import sys
 from pathlib import Path
 
 import cv2
-
+from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QAction, QFont, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
-    QApplication, QFileDialog, QGroupBox, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPushButton, QScrollArea, QSlider, QSplitter, QVBoxLayout, QWidget,
+    QApplication,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSlider,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
 )
-from PyQt6.QtCore import QTimer, Qt
-from PyQt6.QtGui import QImage, QPixmap, QAction, QFont, QKeySequence, QShortcut
 
 # Import modules core
 sys.path.insert(0, str(Path(__file__).parent))
 
-from core.eye_tracker import EyeTracker, EyeTrackerError, STATE_OPEN, STATE_NO_FACE
-from core.alert_system import AlertSystem, REASON_FACE_LOST
+from config import ALERT_CONFIG, EYE_TRACKING_CONFIG, PDF_CONFIG, STATS_CONFIG
+from core.alert_system import REASON_FACE_LOST, AlertSystem
+from core.eye_tracker import STATE_NO_FACE, STATE_OPEN, EyeTracker, EyeTrackerError
 from core.pdf_reader import PDFReader
 from core.statistics_manager import StatisticsManager
-from config import EYE_TRACKING_CONFIG, ALERT_CONFIG, PDF_CONFIG, STATS_CONFIG
+
 
 class NoBreakReadingApp(QMainWindow):
     """Application principale PyQt6"""
