@@ -30,3 +30,6 @@ No Break Reader conversation perplexity.md
 # Raw demo recordings (the GIFs in docs/demo are what we publish)
 *.mp4
 *.mov
+
+# Local Claude Code settings
+.claude/

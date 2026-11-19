@@ -38,15 +38,26 @@ Started as the final project for the *Human Machine Interface* course (Aivancity
 | Version | Status |
 |---|---|
 | **Desktop v1** ([`desktop/`](desktop/)): Python, PyQt6 | Feature-frozen. Only bug fixes from now on. |
-| **Web app**: runs entirely in the browser | In development (English UI with a French switch, local only for now) |
+| **Web app** ([`web/`](web/)): TypeScript, runs entirely in the browser | In development: works locally, not deployed yet. English UI with a French switch. |
 
 ## Repository layout
 
 | Path | Description |
 |------|-------------|
+| [`web/`](web/) | Web app: TypeScript, MediaPipe Tasks, pdf.js, Web Audio |
 | [`desktop/`](desktop/) | Desktop app v1 (PyQt6) with its tests |
 | [`prototypes/`](prototypes/) | First standalone scripts: eye detection, then eye detection plus a sound alert |
 | [`docs/demo/`](docs/demo/) | Demo GIFs used in this README |
+
+## Quick start (web app)
+
+```bash
+cd web
+npm install
+npm run dev        # then open http://localhost:5173
+```
+
+You need Node.js 20+ and a webcam. See [`web/README.md`](web/README.md) for details.
 
 ## Quick start (desktop v1)
 
@@ -64,7 +75,8 @@ You need Python 3.9–3.12, a webcam and working audio output. To run the tests:
 
 - [x] Desktop v1: eye tracking, progressive alarm, face-lost alarm, PDF reader, statistics, tests
 - [x] Continuous integration: lint and tests on every push
-- [ ] Web app: in-browser face tracking, alarm and PDF reader, English and French
+- [x] Web app: in-browser face tracking, alarm and PDF reader, English and French (local)
+- [ ] Decide on deployment (privacy and security review)
 - [ ] Personal calibration of the eye-closure threshold
 - [ ] Settings panel, gentler alert levels (visual first, then sound), snooze
 - [ ] Session history with charts
