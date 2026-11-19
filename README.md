@@ -48,6 +48,8 @@ Started as the final project for the *Human Machine Interface* course (Aivancity
 | [`desktop/`](desktop/) | Desktop app v1 (PyQt6) with its tests |
 | [`prototypes/`](prototypes/) | First standalone scripts: eye detection, then eye detection plus a sound alert |
 | [`docs/demo/`](docs/demo/) | Demo GIFs used in this README |
+| [`docs/journal/`](docs/journal/) | Project journal: dated work log and decision log |
+| [`CHANGELOG.md`](CHANGELOG.md) | User-facing changes per version |
 
 ## Quick start (web app)
 
